@@ -1,14 +1,17 @@
-import mysql from 'mysql2/promise';
+import mongoose from 'mongoose';
 
+// MongoDB connection string - use environment variable or default local MongoDB
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/staf';
 
-const pool = mysql.createPool({
-  host: '127.0.0.1',
-  user: 'root',
-  password: 'ABCD',
-  database: 'staf',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+const connectDB = async () => {
+  try {
+    await mongoose.connect(MONGODB_URI);
+    console.log('MongoDB Connected Successfully');
+  } catch (error) {
+    console.error('MongoDB Connection Error:', error.message);
+    process.exit(1);
+  }
+};
 
-export default pool;
+export default connectDB;
+

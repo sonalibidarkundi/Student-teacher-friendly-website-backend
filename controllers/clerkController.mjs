@@ -1,4 +1,7 @@
-import pool from '../config/db.mjs';
+import User from '../models/User.js';
+import Student from '../models/Student.js';
+import Staff from '../models/Staff.js';
+import Class from '../models/Class.js';
 import multer from 'multer';
 import path from 'path';
 
@@ -21,44 +24,36 @@ export const signUp = [upload.single('logo'), async (req, res) => {
   if (role === 'provider') role = 'staff';
 
   try {
-    const [result] = await pool.query(
-      'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
-      [username, password, role]
-    );
-    res.status(201).json({ id: result.insertId, username, role });
+    const user = new User({ username, password, role });
+    await user.save();
+    res.status(201).json({ id: user._id, username, role });
   } catch (error) {
-    console.error('Signup error:', error); // Log the error for debugging
+    console.error('Signup error:', error);
     res.status(500).json({ error: 'User registration failed' });
   }
 }];
 
 export const logIn = async (req, res) => {
-
   const { username, password } = req.body;
 
   try {
-    const [users] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
-    const user = users[0];
-
+    const user = await User.findOne({ username });
     if (user && user.password === password) {
-      res.status(200).json({ id: user.id, username: user.username, role: user.role, image: user.image });
+      res.status(200).json({ id: user._id, username: user.username, role: user.role, image: user.image });
     } else {
       res.status(401).json({ error: 'Invalid credentials' });
     }
   } catch (error) {
-    console.error('User login failed:', error); // Log the error for debugging
+    console.error('User login failed:', error);
     res.status(500).json({ error: 'User login failed' });
   }
 };
 
 export const getUser = async (req, res) => {
   const { username } = req.body;
-  
 
   try {
-    const [users] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
-    const user = users[0];
-
+    const user = await User.findOne({ username });
     if (user) {
       res.status(200).json(user);
     } else {
@@ -70,40 +65,32 @@ export const getUser = async (req, res) => {
   }
 };
 
-
 // Function to create a new class
 export const createClass = async (req, res) => {
   const { name } = req.body;
   try {
-      const [result] = await pool.query('INSERT INTO classes (name) VALUES (?)', [name]);
-      console.log(result);
-      res.status(201).json({ id: result.insertId, name });
+    const newClass = new Class({ name });
+    await newClass.save();
+    res.status(201).json({ id: newClass._id, name });
   } catch (error) {
-      console.error('Error inserting class:', error);
-      res.status(500).json({ error: 'Failed to create class' });
+    console.error('Error inserting class:', error);
+    res.status(500).json({ error: 'Failed to create class' });
   }
 };
-
-// In your server file, e.g., server.js or app.js
 
 // Function to get all classes
 export const getAllClasses = async (req, res) => {
   try {
-      const [rows] = await pool.query('SELECT * FROM classes');
-      res.status(200).json(rows);
+    const classes = await Class.find();
+    res.status(200).json(classes);
   } catch (error) {
-      console.error('Error fetching classes:', error);
-      res.status(500).json({ error: 'Failed to fetch classes' });
+    console.error('Error fetching classes:', error);
+    res.status(500).json({ error: 'Failed to fetch classes' });
   }
 };
 
-
-
-
-
 // Function to create a new student
 export const createStudent = async (req, res) => {
- // console.log(req.body);
   const { username, password, fullname, mobile_number, address, class_id } = req.body;
   
   // Validate inputs
@@ -122,33 +109,40 @@ export const createStudent = async (req, res) => {
   }
   
   try {
-      // Check if username already exists
-      const [existingUsers] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
-      if (existingUsers.length > 0) {
-          return res.status(400).json({ error: 'Username already exists' });
-      }
-      
-      // Check if class exists
-      const [classes] = await pool.query('SELECT id FROM classes WHERE id = ?', [class_id]);
-      if (classes.length === 0) {
-          return res.status(400).json({ error: 'Invalid class selected' });
-      }
-      
-      // Create user first
-      const [userResult] = await pool.query('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', [username, password, 'student']);
-      const userId = userResult.insertId;
+    // Check if username already exists
+    const existingUser = await User.findOne({ username });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+    
+    // Check if class exists
+    const classExists = await Class.findById(class_id);
+    if (!classExists) {
+      return res.status(400).json({ error: 'Invalid class selected' });
+    }
+    
+    // Create user first
+    const user = new User({ username, password, role: 'student' });
+    await user.save();
 
-      // Create student with user_id
-      const [studentResult] = await pool.query('INSERT INTO students (user_id, fullname, mobile_number, address, class_id) VALUES (?, ?, ?, ?, ?)', [userId, fullname, mobile_number, address, class_id]);
-      res.status(201).json({ id: studentResult.insertId, username, fullname, mobile_number, address, class_id });
+    // Create student with user_id
+    const student = new Student({
+      user_id: user._id,
+      fullname,
+      mobile_number,
+      address,
+      class_id
+    });
+    await student.save();
+    
+    res.status(201).json({ id: student._id, username, fullname, mobile_number, address, class_id });
   } catch (error) {
-      console.error('Error inserting student:', error);
-      res.status(500).json({ error: 'Failed to create student' });
+    console.error('Error inserting student:', error);
+    res.status(500).json({ error: 'Failed to create student' });
   }
 };
 
-//Craete Staff
-// Server-side code to create staff and assign classes
+// Create Staff
 export const createStaff = async (req, res) => {
   const { username, password, fullname, mobile_number, address, class_ids } = req.body;
 
@@ -157,62 +151,48 @@ export const createStaff = async (req, res) => {
     return res.status(400).json({ error: 'All fields are required and class_ids must be an array' });
   }
 
-  const connection = await pool.getConnection(); // Get a connection from the pool
-
   try {
-    // Start a transaction
-    await connection.beginTransaction();
-
     // Create user first
-    const [userResult] = await connection.query('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', [username, password, 'staff']);
-    const userId = userResult.insertId;
+    const user = new User({ username, password, role: 'staff' });
+    await user.save();
 
     // Create staff with user_id
-    const [staffResult] = await connection.query('INSERT INTO staffs (user_id, fullname, mobile_number, address) VALUES (?, ?, ?, ?)', [userId, fullname, mobile_number, address]);
-    const staffId = staffResult.insertId;
+    const staff = new Staff({
+      user_id: user._id,
+      fullname,
+      mobile_number,
+      address,
+      class_ids
+    });
+    await staff.save();
 
-    // Assign classes to staff using staffId
-    for (const class_id of class_ids) {
-      await connection.query('INSERT INTO staff_classes (staff_id, class_id) VALUES (?, ?)', [staffId, class_id]);
-    }
-
-    // Commit the transaction
-    await connection.commit();
-
-    res.status(201).json({ id: staffId, username, fullname, mobile_number, address, class_ids });
+    res.status(201).json({ id: staff._id, username, fullname, mobile_number, address, class_ids });
   } catch (error) {
-    // Rollback the transaction in case of error
-    await connection.rollback();
-    
     console.error('Error inserting staff:', error);
     res.status(500).json({ error: 'Failed to create staff' });
-  } finally {
-    // Release the connection back to the pool
-    connection.release();
   }
 };
-//To get the student ID
-export const getStudentId = async (req, res) => {
 
+// Get the student ID
+export const getStudentId = async (req, res) => {
   const { username } = req.body;
 
   try {
-      // Query to get the student ID based on the username
-      const [result] = await pool.query(
-          `SELECT students.id AS student_id
-           FROM users
-           INNER JOIN students ON users.id = students.user_id
-           WHERE users.username = ?`,
-          [username]
-      );
+    // Query to get the student ID based on the username
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
 
-      if (result.length > 0) {
-          res.status(200).json({ studentId: result[0].student_id });
-      } else {
-          res.status(404).json({ error: 'Student not found' });
-      }
+    const student = await Student.findOne({ user_id: user._id });
+    if (student) {
+      res.status(200).json({ studentId: student._id });
+    } else {
+      res.status(404).json({ error: 'Student not found' });
+    }
   } catch (error) {
-      console.error('Error fetching student ID:', error);
-      res.status(500).json({ error: 'Failed to fetch student ID' });
+    console.error('Error fetching student ID:', error);
+    res.status(500).json({ error: 'Failed to fetch student ID' });
   }
-}
+};
+

@@ -147,11 +147,34 @@ export const createStaff = async (req, res) => {
   const { username, password, fullname, mobile_number, address, class_ids } = req.body;
 
   // Validate the inputs
-  if (!username || !password || !fullname || !mobile_number || !address || !Array.isArray(class_ids)) {
-    return res.status(400).json({ error: 'All fields are required and class_ids must be an array' });
+  if (!username || !password || !fullname || !mobile_number || !address) {
+    return res.status(400).json({ error: 'All fields are required' });
   }
 
   try {
+    // Convert class names/ids to ObjectIds if provided
+    let classObjectIds = [];
+    if (class_ids && Array.isArray(class_ids)) {
+      // Check if the values look like MongoDB ObjectIds (24 hex characters)
+      const isObjectId = (val) => /^[0-9a-fA-F]{24}$/.test(val);
+      
+      const objectIdClassIds = class_ids.filter(id => isObjectId(id));
+      const nameClassIds = class_ids.filter(name => !isObjectId(name));
+      
+      // Find classes by _id if provided
+      if (objectIdClassIds.length > 0) {
+        const classesById = await Class.find({ _id: { $in: objectIdClassIds } });
+        classObjectIds = classesById.map(c => c._id);
+      }
+      
+      // Find classes by name if provided
+      if (nameClassIds.length > 0) {
+        const classesByName = await Class.find({ name: { $in: nameClassIds } });
+        classObjectIds = [...classObjectIds, ...classesByName.map(c => c._id)];
+      }
+    }
+
+
     // Create user first
     const user = new User({ username, password, role: 'staff' });
     await user.save();
@@ -162,11 +185,11 @@ export const createStaff = async (req, res) => {
       fullname,
       mobile_number,
       address,
-      class_ids
+      class_ids: classObjectIds
     });
     await staff.save();
 
-    res.status(201).json({ id: staff._id, username, fullname, mobile_number, address, class_ids });
+    res.status(201).json({ id: staff._id, username, fullname, mobile_number, address, class_ids: classObjectIds });
   } catch (error) {
     console.error('Error inserting staff:', error);
     res.status(500).json({ error: 'Failed to create staff' });
@@ -192,7 +215,54 @@ export const getStudentId = async (req, res) => {
     }
   } catch (error) {
     console.error('Error fetching student ID:', error);
-    res.status(500).json({ error: 'Failed to fetch student ID' });
+res.status(500).json({ error: 'Failed to fetch student ID' });
+  }
+};
+
+// Update Staff class assignments
+export const updateStaffClasses = async (req, res) => {
+  const { username, class_ids } = req.body;
+
+  try {
+    // Find user by username
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Find staff by user_id
+    const staff = await Staff.findOne({ user_id: user._id });
+    if (!staff) {
+      return res.status(404).json({ error: 'Staff not found' });
+    }
+
+    // Convert class names/ids to ObjectIds
+    let classObjectIds = [];
+    if (class_ids && Array.isArray(class_ids)) {
+      const isObjectId = (val) => /^[0-9a-fA-F]{24}$/.test(val);
+      
+      const objectIdClassIds = class_ids.filter(id => isObjectId(id));
+      const nameClassIds = class_ids.filter(name => !isObjectId(name));
+      
+      if (objectIdClassIds.length > 0) {
+        const classesById = await Class.find({ _id: { $in: objectIdClassIds } });
+        classObjectIds = classesById.map(c => c._id);
+      }
+      
+      if (nameClassIds.length > 0) {
+        const classesByName = await Class.find({ name: { $in: nameClassIds } });
+        classObjectIds = [...classObjectIds, ...classesByName.map(c => c._id)];
+      }
+    }
+
+    // Update staff class_ids
+    staff.class_ids = classObjectIds;
+    await staff.save();
+
+    res.status(200).json({ id: staff._id, username, class_ids: classObjectIds });
+  } catch (error) {
+    console.error('Error updating staff classes:', error);
+    res.status(500).json({ error: 'Failed to update staff classes' });
   }
 };
 

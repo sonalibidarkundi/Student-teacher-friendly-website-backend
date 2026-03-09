@@ -62,14 +62,12 @@ const upload = multer({
   })
 });
 
-export const uploadFiles = async (req, res) => {
-  console.log("I'm upload");
-  // Initialize multer to handle file uploads
-  upload.array('files')(req, res, async (err) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-
+// Fixed uploadFiles function - properly configured as middleware array
+export const uploadFiles = [
+  upload.array('files'),
+  async (req, res) => {
+    console.log("I'm upload");
+    
     // Extract username and class_ids from the request body
     const { username, class_ids } = req.body;
 
@@ -101,10 +99,10 @@ export const uploadFiles = async (req, res) => {
       console.error('Error during database insert:', error);
       res.status(500).json({ error: 'Failed to upload files' });
     }
-  });
-};
+  }
+];
 
-// To get student classid and studentid 
+// To get student classid and studentid
 // API to get student details by username
 export const getStudentDetails = async (req, res) => {
   const { username } = req.params;
@@ -183,7 +181,7 @@ export const getAllComplaints = async (req, res) => {
   }
 };
 
-// Get complaint for specific 
+// Get complaint for specific
 export const detailCom = async (req, res) => {
   const { student_id } = req.params;
   try {
@@ -194,4 +192,3 @@ export const detailCom = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch complaints' });
   }
 };
-

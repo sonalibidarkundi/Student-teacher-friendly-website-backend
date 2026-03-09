@@ -2,10 +2,13 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import path from 'path';
+import dotenv from 'dotenv';
 import connectDB from './config/db.mjs';
 import clerkRoutes from './routes/clerk.mjs';
 import jobRoutes from './routes/jobs.mjs';
 import staffRouter from './routes/staff.mjs';
+
+dotenv.config();
 
 const app = express();
 const __dirname = path.resolve();

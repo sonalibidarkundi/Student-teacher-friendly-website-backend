@@ -1,5 +1,5 @@
 import express from 'express';
-import { signUp, logIn,getUser,createClass,getAllClasses,createStudent,createStaff,getStudentId} from '../controllers/clerkController.mjs';
+import { signUp, logIn,getUser,createClass,getAllClasses,createStudent,createStaff,getStudentId,updateStaffClasses} from '../controllers/clerkController.mjs';
 
 const userRouter = express.Router();
 
@@ -11,6 +11,7 @@ userRouter.post('/students',createStudent);
 userRouter.get('/getAllClasses',getAllClasses);
 userRouter.post('/staff',createStaff);
 userRouter.post('/getStudentId',getStudentId);  
+userRouter.put('/staff/classes',updateStaffClasses);  // Update staff class assignments
 
 
 export default userRouter;

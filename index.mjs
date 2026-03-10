@@ -3,6 +3,8 @@ import bodyParser from 'body-parser';
 import cors from 'cors';
 import path from 'path';
 import dotenv from 'dotenv';
+import serverless from 'serverless-http';
+
 import connectDB from './config/db.mjs';
 import clerkRoutes from './routes/clerk.mjs';
 import jobRoutes from './routes/jobs.mjs';
@@ -20,15 +22,14 @@ connectDB();
 app.use(express.json());
 app.use(cors());
 app.use(bodyParser.json());
+
 app.use('/api/clerk', clerkRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/staff', staffRouter);
 
-// Serve static files from the "uploads" directory
+// Static folder
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
-
+// Export for Vercel
+export const handler = serverless(app);
+export default app;

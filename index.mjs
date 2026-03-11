@@ -33,3 +33,9 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Export for Vercel
 export const handler = serverless(app);
 export default app;
+
+// For Render deployment
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
